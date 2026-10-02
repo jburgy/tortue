@@ -30,6 +30,42 @@ Out of scope for v1: `tvrtle.542` (raster TV Turtle), `germ.147`
 editor — superseded by reading a `TO ... END` block from the textarea),
 `declar.67`/`setup.306`/`loader.154` (MACLISP/ITS bootstrapping).
 
+## Pipeline
+
+```
+source text --lexer.js--> RawToken[] --parser.js--> CallExpr[] (one parsed line)
+```
+
+`lexer.js` owns everything `reader.201`'s `LINE` + `PASS2`/`UNSQUISH` do
+*except* raw-TTY rubout/echo editing: splitting on whitespace and Logo's
+special punctuation, recognizing numbers, and wrapping `'x`, `"x`/`"(...)`,
+and `[...]` into the `Quoted`/`DoubleQuoted`/`Bracketed` marker classes from
+`types.js` (nesting brackets as needed). It drops `;`/`! ... !` comments
+entirely. See `types.js` for the exact `RawToken` contract — this is the
+one boundary most likely to cause integration bugs, so it is specified
+there rather than left to convention.
+
+`parser.js` owns everything `parser.129` does: walking the `RawToken[]`
+left-to-right (the `FIRST`/`TOPARSE` pattern), turning quoted/double-quoted
+tokens into literal values, `Bracketed` into `LogoListLit`, bare words into
+either a `VarRef` (leading `:`) or a `CallExpr` by looking up the word's
+arity via `PRIMITIVES`/the interpreter's procedure table (ported from
+`PARSE-PROP`/`HOW-TO-PARSE-INPUTS`), and resolving infix operators
+(`+ - * / = < >` etc.) by precedence climbing (ported from `PARSE-INFIX`/
+`PRECEDENCE`/`ASSOCIATE`).
+
+**Simplification vs. the original incremental REPL**: LLOGO parses and
+evaluates one line at a time as it's typed, so a call to a not-yet-defined
+procedure is a hard error unless deferred via the `PARSEMACRO` throw/retry
+hack. Since a browser demo has the *whole script* available upfront
+(textarea contents, not a character-at-a-time teletype), `interpreter.js`
+instead does two passes: (1) scan for every `TO name :p1 :p2 ... / END`
+block and register `name`'s arity (just the parameter count, body not
+parsed yet), so mutual/forward recursion between procedures works for
+free; (2) parse every procedure body and every top-level line. This
+sidesteps `PARSEMACRO` entirely while preserving the same arity-driven
+parsing of calls.
+
 ## Data model (`src/types.js`)
 
 Runtime **values** use plain JS types wherever possible:

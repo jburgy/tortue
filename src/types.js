@@ -26,6 +26,48 @@
 export const NO_VALUE = Symbol("NO-VALUE");
 
 /**
+ * Raw tokens produced by `src/lexer.js`, *before* `src/parser.js` turns them
+ * into the AST below. A line of input lexes to `RawToken[]`.
+ *
+ * - A bare `number` is a numeric literal.
+ * - A bare `string` is a bare word (case preserved) — in Logo, an unquoted
+ *   word appearing where an expression is expected always names a
+ *   procedure call (including `:name`, a variable read); it is never
+ *   itself a literal value. This matches `reader.201`'s token stream.
+ * - `Quoted`, `DoubleQuoted`, and `Bracketed` wrap the three MACLISP
+ *   PASS2 quoting forms (`'x`, `"x` / `"(...)`, `[...]`); `parser.js` turns
+ *   `Quoted`/`DoubleQuoted` content into literal values and `Bracketed`
+ *   content into a `LogoListLit`. Comments (`; ...` / `! ... !`) are
+ *   dropped entirely by the lexer and never appear in `RawToken[]`.
+ * @typedef {number|string|Quoted|DoubleQuoted|Bracketed} RawToken
+ */
+
+/** `'word` — PASS2's `(QUOTE word)`. */
+export class Quoted {
+  /** @param {RawToken} value */
+  constructor(value) {
+    this.value = value;
+  }
+}
+
+/** `"word` or `"(a b c)` — PASS2's `(DOUBLE-QUOTE ...)`. */
+export class DoubleQuoted {
+  /** @param {RawToken|RawToken[]} value Single word, or a list when the
+   *  source used `"(...)`. */
+  constructor(value) {
+    this.value = value;
+  }
+}
+
+/** `[a b c]` — PASS2's `(SQUARE-BRACKETS (...))`, may nest. */
+export class Bracketed {
+  /** @param {RawToken[]} items */
+  constructor(items) {
+    this.items = items;
+  }
+}
+
+/**
  * A reference to a variable, e.g. `:X`. Produced by the parser, consumed by
  * the interpreter's `evalExpr`.
  */
@@ -182,6 +224,29 @@ export function defAbbreviations(canonicalName, aliases) {
   for (const alias of aliases) {
     PRIMITIVES.set(alias.toUpperCase(), spec);
   }
+}
+
+/**
+ * Arity of user-defined procedures, keyed by uppercased name, filled in by
+ * `interpreter.js`'s first pass over a script (see docs/ARCHITECTURE.md)
+ * before anything is parsed. `parser.js` consults this, via `arityOf`
+ * below, for any name not already in `PRIMITIVES`.
+ * @type {Map<string, number>}
+ */
+export const PROCEDURE_ARITY = new Map();
+
+/**
+ * Resolve how many arguments a word consumes when used as a call, per
+ * `parser.129`'s `PARSE-PROP`/`HOW-TO-PARSE-INPUTS`: primitives first,
+ * then user-defined procedures (registered in `PROCEDURE_ARITY`).
+ * @param {string} name
+ * @returns {number|'L'|undefined} undefined means "unknown procedure".
+ */
+export function arityOf(name) {
+  const key = name.toUpperCase();
+  const prim = PRIMITIVES.get(key);
+  if (prim) return prim.arity;
+  return PROCEDURE_ARITY.get(key);
 }
 
 /**
