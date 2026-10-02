@@ -1,0 +1,14 @@
+{
+  "name": "tortue",
+  "version": "0.1.0",
+  "description": "A browser-based LOGO interpreter translated from MIT LISP LOGO (MACLISP) into vanilla ES6, rendering turtle graphics to SVG.",
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "test": "node --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jburgy/tortue.git"
+  }
+}
