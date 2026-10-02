@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   LogoError,
+  NO_VALUE,
   PRIMITIVES,
   PROCEDURE_ARITY,
 } from "../src/types.js";
@@ -172,6 +173,15 @@ test("arithmetic primitives preserve LLOGO numeric behavior", () => {
   const floatSample = random(1.5, 2.5);
   assert.ok(floatSample >= 1.5 && floatSample < 2.5);
   assert.throws(() => random(10), LogoError);
+});
+
+test("SLEEP pauses for approximately the requested duration", () => {
+  const sleep = primitiveFn("SLEEP");
+  const start = Date.now();
+  assert.equal(sleep(0.05), NO_VALUE);
+  const elapsed = Date.now() - start;
+  assert.ok(elapsed >= 45, `expected at least ~50ms, slept ${elapsed}ms`);
+  assert.throws(() => sleep("ABC"), LogoError);
 });
 
 test("abbreviations and synonyms resolve to the same primitive spec", () => {

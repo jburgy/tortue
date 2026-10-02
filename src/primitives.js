@@ -9,6 +9,7 @@ import {
   defAbbreviations,
   LogoError,
   isTrue,
+  NO_VALUE,
 } from "./types.js";
 
 /** @typedef {import("./types.js").LogoValue} LogoValue */
@@ -723,6 +724,28 @@ function roundoffValues(...values) {
 }
 
 /**
+ * Pause execution for the given number of seconds, the ES6 analog of
+ * `primit.304`'s `SLEEP`. Implemented as a real-time busy-wait rather than
+ * a JS `setTimeout`/`Promise`, because the interpreter (and every primitive
+ * in it, including this one) is plain synchronous recursive-descent code —
+ * see docs/ARCHITECTURE.md's rationale for running the whole interpreter
+ * in a Web Worker instead of threading `async`/`await` through every call.
+ * Blocking the worker's single thread like this is harmless: it doesn't
+ * freeze the page (the worker is isolated from the main thread), and
+ * `Worker.terminate()` can still forcibly stop it mid-wait.
+ * @param {LogoValue} seconds
+ * @returns {typeof NO_VALUE}
+ */
+function sleepValue(seconds) {
+  const duration = expectNumber("SLEEP", seconds);
+  const until = Date.now() + duration * 1000;
+  while (Date.now() < until) {
+    // Busy-wait: see the doc comment above for why this is acceptable here.
+  }
+  return NO_VALUE;
+}
+
+/**
  * Generate a Logo random number.
  * With no inputs this returns a floating-point value in [0, 1).
  * With two numeric inputs it returns a random value between them, inclusive
@@ -832,6 +855,7 @@ function registerPrimitives() {
   registerPrimitive("SINE", { kind: "expr", arity: 1, fn: sineValue });
   registerPrimitive("COSINE", { kind: "expr", arity: 1, fn: cosineValue });
   registerPrimitive("ARCTAN", { kind: "expr", arity: 2, fn: arctanValue }, ["ATANGENT"]);
+  registerPrimitive("SLEEP", { kind: "expr", arity: 1, fn: sleepValue });
 }
 
 registerPrimitives();

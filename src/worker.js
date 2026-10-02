@@ -32,9 +32,13 @@ setDefaultRenderer({
    * @param {number} y1
    * @param {number} x2
    * @param {number} y2
+   * @param {boolean} [erasing] See `turtle.js`'s `Turtle#penErase` doc
+   *   comment; must be forwarded through to the main thread's renderer or
+   *   `PENERASE` silently becomes a no-op (every line draws in the normal
+   *   foreground color regardless of pen mode).
    */
-  line(x1, y1, x2, y2) {
-    postMessage({ type: "line", x1, y1, x2, y2 });
+  line(x1, y1, x2, y2, erasing = false) {
+    postMessage({ type: "line", x1, y1, x2, y2, erasing });
   },
   /** Forward a clear-the-drawing request to the main thread. */
   clear() {

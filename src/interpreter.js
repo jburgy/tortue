@@ -394,39 +394,24 @@ defPrimitive("IFFALSE", {
 });
 
 /**
- * `IF <condition> <rest of line>`: evaluates the condition, and if true,
- * evaluates the remaining forms in order, mirroring LLOGO's `IF` (which
- * the original compiled at parse time into a `COND`; here it is simply a
- * `'L'`-arity `fexpr`, see docs/ARCHITECTURE.md).
+ * `IF <condition> <body>`: evaluates the condition, and if true, runs
+ * `<body>` (typically a `[...]` bracket, but a single bare instruction also
+ * works via `runBodyArg`). Fixed arity 2, not LLOGO's original "rest of
+ * line" `'L'`-arity — like `REPEAT`/`WHILE`/`UNTIL`/`FOREVER` (see their
+ * comments), an unbounded `IF` would swallow every statement that follows
+ * it in the same bracket as extra "then" clauses, which is exactly the bug
+ * this port hit while nesting `IF` inside a `FOREVER` body (see
+ * docs/ARCHITECTURE.md).
  */
 defPrimitive("IF", {
   kind: "fexpr",
-  arity: "L",
+  arity: 2,
   fn: (args, env) => {
-    if (args.length === 0) return NO_VALUE;
     const cond = evalExpr(args[0], env);
     if (!isTrue(cond)) return NO_VALUE;
-    let result = NO_VALUE;
-    for (let i = 1; i < args.length; i++) result = runBodyArg(args[i], env);
-    return result;
+    return runBodyArg(args[1], env);
   },
 });
-
-/**
- * Validate a `REPEAT` count, raising a clear error instead of silently
- * looping zero times when the input isn't actually numeric (e.g.
- * `REPEAT "ABC [...]`, where `Number("ABC")` is `NaN` and `i <= NaN` is
- * always `false`).
- * @param {import('./types.js').LogoValue} value
- * @returns {number}
- */
-function requireRepeatCount(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) {
-    throw wrongTypeArgument("REPEAT", value);
-  }
-  return n;
-}
 
 /**
  * Evaluate a materialized bracket argument (array of words/numbers/
@@ -450,45 +435,50 @@ function runBodyArg(bodyExpr, env) {
 
 defPrimitive("REPEAT", {
   kind: "fexpr",
-  arity: "L",
+  arity: 2,
   fn: (args, env) => {
-    const n = requireRepeatCount(evalExpr(args[0], env));
+    const count = evalExpr(args[0], env);
+    const n = Number(count);
+    // Without this check, a non-numeric count (e.g. `REPEAT "ABC [...]`)
+    // silently loops zero times instead of erroring: `i <= NaN` is always
+    // `false`.
+    if (!Number.isFinite(n)) throw wrongTypeArgument("REPEAT", count);
     let result = NO_VALUE;
     for (let i = 1; i <= n; i++) {
-      for (let j = 1; j < args.length; j++) result = runBodyArg(args[j], env);
+      result = runBodyArg(args[1], env);
     }
     return result;
   },
 });
 defPrimitive("WHILE", {
   kind: "fexpr",
-  arity: "L",
+  arity: 2,
   fn: (args, env) => {
     let result = NO_VALUE;
     while (isTrue(evalExpr(args[0], env))) {
-      for (let j = 1; j < args.length; j++) result = runBodyArg(args[j], env);
+      result = runBodyArg(args[1], env);
     }
     return result;
   },
 });
 defPrimitive("UNTIL", {
   kind: "fexpr",
-  arity: "L",
+  arity: 2,
   fn: (args, env) => {
     let result = NO_VALUE;
     while (!isTrue(evalExpr(args[0], env))) {
-      for (let j = 1; j < args.length; j++) result = runBodyArg(args[j], env);
+      result = runBodyArg(args[1], env);
     }
     return result;
   },
 });
 defPrimitive("FOREVER", {
   kind: "fexpr",
-  arity: "L",
+  arity: 1,
   fn: (args, env) => {
     // eslint-disable-next-line no-constant-condition
     while (true) {
-      for (const a of args) runBodyArg(a, env);
+      runBodyArg(args[0], env);
     }
   },
 });

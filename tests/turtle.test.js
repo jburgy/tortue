@@ -15,8 +15,8 @@ function createFakeRenderer() {
     lines,
     clearCount: () => clears,
     renderer: {
-      line(x1, y1, x2, y2) {
-        lines.push({ x1, y1, x2, y2 });
+      line(x1, y1, x2, y2, erasing = false) {
+        lines.push({ x1, y1, x2, y2, erasing });
       },
       clear() {
         clears += 1;
@@ -31,7 +31,7 @@ test("FORWARD draws north from heading 0", () => {
 
   turtle.forward(25);
 
-  assert.deepEqual(fake.lines, [{ x1: 0, y1: 0, x2: 0, y2: 25 }]);
+  assert.deepEqual(fake.lines, [{ x1: 0, y1: 0, x2: 0, y2: 25, erasing: false }]);
   assert.deepEqual(turtle.here(), [0, 25, 0]);
 });
 
@@ -41,7 +41,7 @@ test("RIGHT 90 then FORWARD draws east", () => {
 
   turtle.right(90).forward(10);
 
-  assert.deepEqual(fake.lines, [{ x1: 0, y1: 0, x2: 10, y2: 0 }]);
+  assert.deepEqual(fake.lines, [{ x1: 0, y1: 0, x2: 10, y2: 0, erasing: false }]);
   assert.deepEqual(turtle.here(), [10, 0, 90]);
 });
 
@@ -64,8 +64,8 @@ test("HOME returns to the origin and resets heading", () => {
 
   assert.deepEqual(turtle.here(), [0, 0, 0]);
   assert.deepEqual(fake.lines, [
-    { x1: 0, y1: 0, x2: 10, y2: 0 },
-    { x1: 10, y1: 0, x2: 0, y2: 0 },
+    { x1: 0, y1: 0, x2: 10, y2: 0, erasing: false },
+    { x1: 10, y1: 0, x2: 0, y2: 0, erasing: false },
   ]);
 });
 
@@ -75,8 +75,21 @@ test("SETXY jumps and draws when the pen is down", () => {
 
   turtle.setXY(3, 4);
 
-  assert.deepEqual(fake.lines, [{ x1: 0, y1: 0, x2: 3, y2: 4 }]);
+  assert.deepEqual(fake.lines, [{ x1: 0, y1: 0, x2: 3, y2: 4, erasing: false }]);
   assert.deepEqual(turtle.here(), [3, 4, 0]);
+});
+
+test("PENERASE draws with the erasing flag set; PENPAINT restores normal drawing", () => {
+  const fake = createFakeRenderer();
+  const turtle = new Turtle(fake.renderer);
+
+  turtle.penErase().forward(10);
+  turtle.penPaint().forward(10);
+
+  assert.deepEqual(fake.lines, [
+    { x1: 0, y1: 0, x2: 0, y2: 10, erasing: true },
+    { x1: 0, y1: 10, x2: 0, y2: 20, erasing: false },
+  ]);
 });
 
 test("CLEARSCREEN clears the renderer and resets turtle state", () => {

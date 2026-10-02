@@ -15,3 +15,34 @@ test("runProgram succeeds for a well-formed TO...END block", () => {
   const { lastValue } = runProgram("TO FOO\nOUTPUT 42\nEND\nFOO");
   assert.equal(lastValue, 42);
 });
+
+test("a bracketed body can span multiple physical lines for readability", () => {
+  const { env } = runProgram(
+    [
+      "MAKE \"N 0",
+      "REPEAT 3 [",
+      "  PRINT :N",
+      "  REPEAT 2 [",
+      "    MAKE \"N :N + 1",
+      "  ]",
+      "]",
+    ].join("\n")
+  );
+  assert.equal(env.thing("N"), 6);
+});
+
+test("a TO...END procedure body can itself contain a multi-line bracket", () => {
+  const { lastValue } = runProgram(
+    [
+      "TO TRIPLE.SUM",
+      "MAKE \"TOTAL 0",
+      "REPEAT 3 [",
+      "  MAKE \"TOTAL :TOTAL + 1",
+      "]",
+      "OUTPUT :TOTAL",
+      "END",
+      "TRIPLE.SUM",
+    ].join("\n")
+  );
+  assert.equal(lastValue, 3);
+});
