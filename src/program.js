@@ -16,7 +16,7 @@ import {
   evalExpr,
   setRunList,
 } from "./interpreter.js";
-import { Procedure, NO_VALUE } from "./types.js";
+import { Procedure, NO_VALUE, LogoError } from "./types.js";
 
 // Wire the interpreter's bracket-body execution (REPEAT/IF/WHILE/.../FOREVER)
 // to the real parser, once, the first time this module loads.
@@ -86,13 +86,17 @@ function scan(sourceText) {
     if (tokens === null) continue;
 
     if (typeof tokens[0] === "string" && tokens[0].toUpperCase() === "TO") {
-      const name = String(tokens[1]);
+      if (typeof tokens[1] !== "string") {
+        throw new LogoError("TO NEEDS A PROCEDURE NAME");
+      }
+      const name = tokens[1];
       const params = tokens
         .slice(2)
         .map(String)
         .filter((t) => t.startsWith(":"))
         .map((t) => t.slice(1));
       const bodyLines = [];
+      let sawEnd = false;
       while (i < lines.length) {
         const bodyTokens = tokenizeNonEmpty(lines[i]);
         i++;
@@ -102,9 +106,13 @@ function scan(sourceText) {
           typeof bodyTokens[0] === "string" &&
           bodyTokens[0].toUpperCase() === "END"
         ) {
+          sawEnd = true;
           break;
         }
         bodyLines.push(bodyTokens);
+      }
+      if (!sawEnd) {
+        throw new LogoError(`${name.toUpperCase()} HAS NO END`);
       }
       topLevel.push({ kind: "procedure", index: procedures.length });
       procedures.push({ name, params, bodyLines });
@@ -125,6 +133,15 @@ function scan(sourceText) {
  * definition order (mutual/forward recursion), matching docs/
  * ARCHITECTURE.md's documented simplification versus the original
  * incremental REPL.
+ *
+ * Note this forward-reference support only covers calls made from *inside*
+ * a procedure body, which isn't actually run until it's invoked (typically
+ * well after the whole script has loaded). A top-level instruction line
+ * sitting *between* two `TO` blocks that immediately calls the second,
+ * not-yet-reached one will still fail with "undefined function": pass 1
+ * only registers arities (for parsing), while pass 2's `defineProcedure`
+ * — which is what actually makes a procedure *callable* — still only runs
+ * when the loop below reaches that `TO` block's position in source order.
  * @param {string} sourceText
  * @param {Environment} [env]
  * @returns {{env: Environment, lastValue: import('./types.js').LogoValue|typeof NO_VALUE}}

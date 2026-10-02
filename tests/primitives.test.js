@@ -59,6 +59,16 @@ test("word/list primitives follow the LLOGO contracts", () => {
   assert.equal(char(65), "A");
 });
 
+test("ASCII and CHAR are true inverses, not aliases of the same function", () => {
+  const ascii = primitiveFn("ASCII");
+  const char = primitiveFn("CHAR");
+
+  assert.equal(ascii("A"), 65);
+  assert.equal(char(65), "A");
+  assert.notEqual(PRIMITIVES.get("ASCII"), PRIMITIVES.get("CHAR"));
+  assert.throws(() => ascii("AB"), LogoError);
+});
+
 test("predicate and logical primitives return Logo TRUE/FALSE words", () => {
   const contentsp = primitiveFn("CONTENTSP");
   const primitivep = primitiveFn("PRIMITIVEP");
@@ -171,7 +181,6 @@ test("abbreviations and synonyms resolve to the same primitive spec", () => {
   assert.equal(PRIMITIVES.get("LIST"), PRIMITIVES.get("JOIN"));
   assert.equal(PRIMITIVES.get("SE"), PRIMITIVES.get("SENTENCE"));
   assert.equal(PRIMITIVES.get("WD"), PRIMITIVES.get("WORD"));
-  assert.equal(PRIMITIVES.get("CHAR"), PRIMITIVES.get("ASCII"));
   assert.equal(PRIMITIVES.get("AND"), PRIMITIVES.get("BOTH"));
   assert.equal(PRIMITIVES.get("OR"), PRIMITIVES.get("EITHER"));
   assert.equal(PRIMITIVES.get("SUM"), PRIMITIVES.get("PLUS"));

@@ -36,6 +36,7 @@ import {
   unboundVariable,
   undefinedFunction,
   wrongNumberOfArgs,
+  wrongTypeArgument,
 } from "./errors.js";
 
 /**
@@ -199,12 +200,23 @@ export function evalExpr(expr, env) {
 
 /**
  * Look up and invoke a primitive or user-defined procedure by name.
+ *
+ * A user-defined procedure is checked *first*, so `TO FORWARD ... END`
+ * genuinely redefines `FORWARD` (as in most Logo dialects), rather than
+ * being silently shadowed by the built-in and never callable. `arityOf` in
+ * `types.js` resolves names in the same order, so the parser collects the
+ * right number of arguments for a redefined name too.
  * @param {CallExpr} expr
  * @param {Environment} env
  * @returns {import('./types.js').LogoValue|typeof NO_VALUE}
  */
 function evalCall(expr, env) {
   const name = expr.name.toUpperCase();
+  const proc = PROCEDURES.get(name);
+  if (proc) {
+    const args = expr.args.map((a) => evalExpr(a, env));
+    return callProcedure(proc, args, env);
+  }
   const prim = PRIMITIVES.get(name);
   if (prim) {
     if (prim.kind === "fexpr") {
@@ -212,11 +224,6 @@ function evalCall(expr, env) {
     }
     const args = expr.args.map((a) => evalExpr(a, env));
     return prim.fn(...args);
-  }
-  const proc = PROCEDURES.get(name);
-  if (proc) {
-    const args = expr.args.map((a) => evalExpr(a, env));
-    return callProcedure(proc, args, env);
   }
   throw undefinedFunction(expr.name);
 }
@@ -406,6 +413,22 @@ defPrimitive("IF", {
 });
 
 /**
+ * Validate a `REPEAT` count, raising a clear error instead of silently
+ * looping zero times when the input isn't actually numeric (e.g.
+ * `REPEAT "ABC [...]`, where `Number("ABC")` is `NaN` and `i <= NaN` is
+ * always `false`).
+ * @param {import('./types.js').LogoValue} value
+ * @returns {number}
+ */
+function requireRepeatCount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    throw wrongTypeArgument("REPEAT", value);
+  }
+  return n;
+}
+
+/**
  * Evaluate a materialized bracket argument (array of words/numbers/
  * sublists) as a body: re-parse and run it via `runList`. If the argument
  * wasn't a list (a bare instruction was given instead, e.g. a single
@@ -429,9 +452,9 @@ defPrimitive("REPEAT", {
   kind: "fexpr",
   arity: "L",
   fn: (args, env) => {
-    const n = evalExpr(args[0], env);
+    const n = requireRepeatCount(evalExpr(args[0], env));
     let result = NO_VALUE;
-    for (let i = 1; i <= Number(n); i++) {
+    for (let i = 1; i <= n; i++) {
       for (let j = 1; j < args.length; j++) result = runBodyArg(args[j], env);
     }
     return result;
@@ -470,13 +493,30 @@ defPrimitive("FOREVER", {
   },
 });
 
+/**
+ * Validate that a value is word-like (a string or finite number) before
+ * using it as a variable name, raising a clear type error instead of
+ * silently coercing e.g. a list via `Array.prototype.toString` (so
+ * `MAKE [A B] 5` — a plausible typo for `MAKE "A 5` missing its quote —
+ * fails loudly instead of quietly creating a variable named `"A,B"`).
+ * @param {string} fnName
+ * @param {import('./types.js').LogoValue} value
+ * @returns {string}
+ */
+function requireVariableName(fnName, value) {
+  if (typeof value !== "string" && typeof value !== "number") {
+    throw wrongTypeArgument(fnName, value);
+  }
+  return String(value);
+}
+
 defPrimitive("MAKE", {
   kind: "fexpr",
   arity: 2,
   fn: (args, env) => {
-    const name = evalExpr(args[0], env);
+    const name = requireVariableName("MAKE", evalExpr(args[0], env));
     const value = evalExpr(args[1], env);
-    env.make(String(name), value);
+    env.make(name, value);
     return NO_VALUE;
   },
 });
@@ -487,7 +527,7 @@ defPrimitive("MAKE", {
 defPrimitive("THING", {
   kind: "fexpr",
   arity: 1,
-  fn: (args, env) => env.thing(String(evalExpr(args[0], env))),
+  fn: (args, env) => env.thing(requireVariableName("THING", evalExpr(args[0], env))),
 });
 defPrimitive("LOCAL", {
   kind: "fexpr",
@@ -496,9 +536,9 @@ defPrimitive("LOCAL", {
     for (const a of args) {
       const name = evalExpr(a, env);
       if (Array.isArray(name)) {
-        for (const n of name) env.local(String(n));
+        for (const n of name) env.local(requireVariableName("LOCAL", n));
       } else {
-        env.local(String(name));
+        env.local(requireVariableName("LOCAL", name));
       }
     }
     return NO_VALUE;

@@ -353,12 +353,28 @@ function wordValues(...values) {
 }
 
 /**
- * Produce a one-character word from an ASCII/character code.
+ * Produce a one-character word from a numeric character code (the inverse
+ * of `ASCII`).
  * @param {LogoValue} value
  * @returns {string}
  */
-function asciiValue(value) {
+function charValue(value) {
   return String.fromCharCode(Math.trunc(expectNumber("CHAR", value)));
+}
+
+/**
+ * Produce the numeric character code of a one-character word (the inverse
+ * of `CHAR`).
+ * @param {LogoValue} value
+ * @returns {number}
+ */
+function asciiValue(value) {
+  const word = expectWordLike("ASCII", value);
+  const text = String(word);
+  if (text.length !== 1) {
+    throw new LogoError(`ASCII DOESN'T LIKE ${text} AS A ONE-CHARACTER WORD`);
+  }
+  return text.charCodeAt(0);
 }
 
 /**
@@ -758,7 +774,8 @@ function registerPrimitives() {
   registerPrimitive("LPUT", { kind: "expr", arity: "L", fn: lputValues });
   registerPrimitive("SENTENCE", { kind: "expr", arity: "L", fn: sentenceValues }, ["S", "SE"]);
   registerPrimitive("WORD", { kind: "expr", arity: "L", fn: wordValues }, ["WD", "&"]);
-  registerPrimitive("ASCII", { kind: "expr", arity: 1, fn: asciiValue }, ["CHAR"]);
+  registerPrimitive("CHAR", { kind: "expr", arity: 1, fn: charValue });
+  registerPrimitive("ASCII", { kind: "expr", arity: 1, fn: asciiValue });
 
   registerPrimitive("CONTENTSP", { kind: "expr", arity: 1, fn: contentspValue });
   registerPrimitive("PRIMITIVEP", { kind: "expr", arity: 1, fn: primitivepValue });

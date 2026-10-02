@@ -6,6 +6,7 @@ import {
   LogoListLit,
   Parenthesized,
   PRIMITIVES,
+  PROCEDURE_ARITY,
   Quoted,
   VarRef,
   arityOf,
@@ -226,7 +227,11 @@ function parseWord(token, cursor) {
     throw new LogoError(`${name} IS AN UNDEFINED FUNCTION`);
   }
 
-  const kind = PRIMITIVES.get(name)?.kind;
+  // A user-defined procedure always has plain fixed arity and is never a
+  // `fexpr`, even when it redefines a `fexpr` primitive (e.g. `TO REPEAT
+  // ... END`) — `arityOf` already prefers the procedure's arity in that
+  // case (see types.js), so the primitive's `kind` must not leak through.
+  const kind = PROCEDURE_ARITY.has(name) ? undefined : PRIMITIVES.get(name)?.kind;
   if (kind === "fexpr" || arity === "L") {
     return new CallExpr(name, parseRestArguments(cursor, name));
   }

@@ -251,17 +251,19 @@ export function defAbbreviations(canonicalName, aliases) {
 export const PROCEDURE_ARITY = new Map();
 
 /**
- * Resolve how many arguments a word consumes when used as a call, per
- * `parser.129`'s `PARSE-PROP`/`HOW-TO-PARSE-INPUTS`: primitives first,
- * then user-defined procedures (registered in `PROCEDURE_ARITY`).
+ * Resolve how many arguments a word consumes when used as a call.
+ * User-defined procedures are checked *first*, so a script that redefines
+ * a primitive's name (`TO FORWARD ... END`) is parsed using its own arity,
+ * matching `interpreter.js`'s `evalCall`, which resolves names in the same
+ * order so the redefinition is actually reachable at call time too.
  * @param {string} name
  * @returns {number|'L'|undefined} undefined means "unknown procedure".
  */
 export function arityOf(name) {
   const key = name.toUpperCase();
-  const prim = PRIMITIVES.get(key);
-  if (prim) return prim.arity;
-  return PROCEDURE_ARITY.get(key);
+  const arity = PROCEDURE_ARITY.get(key);
+  if (arity !== undefined) return arity;
+  return PRIMITIVES.get(key)?.arity;
 }
 
 /**

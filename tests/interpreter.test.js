@@ -16,6 +16,7 @@ import {
   LogoListLit,
   Procedure,
   NO_VALUE,
+  LogoError,
   defPrimitive,
   PRIMITIVES,
 } from "../src/types.js";
@@ -288,4 +289,42 @@ test("runList is injectable via setRunList and used by REPEAT/IF for bracketed b
 test("evalExpr: calling an undefined name throws a LogoError", () => {
   const env = new Environment();
   assert.throws(() => evalExpr(new CallExpr("NO.SUCH.THING", []), env));
+});
+
+test("REPEAT raises a clear error for a non-numeric count instead of silently looping zero times", () => {
+  const env = new Environment();
+  assert.throws(() => evalExpr(new CallExpr("REPEAT", ["ABC", 1]), env), LogoError);
+});
+
+test("a user-defined procedure can redefine a primitive name and is actually callable", () => {
+  declareProcedure("TEST.ADD", ["A", "B"]);
+  defineProcedure(
+    new Procedure(
+      "TEST.ADD",
+      ["A", "B"],
+      [{ tag: null, forms: [new CallExpr("OUTPUT", ["REDEFINED"])] }]
+    )
+  );
+  try {
+    const env = new Environment();
+    assert.equal(evalExpr(new CallExpr("TEST.ADD", [1, 2]), env), "REDEFINED");
+  } finally {
+    // Restore the primitive for any other test relying on it.
+    PROCEDURES.delete("TEST.ADD");
+  }
+});
+
+test("MAKE/LOCAL raise a clear type error instead of silently stringifying a non-word name", () => {
+  const env = new Environment();
+  assert.throws(
+    () => evalExpr(new CallExpr("MAKE", [[1, 2], 5]), env),
+    LogoError
+  );
+  // LOCAL legitimately accepts a list of names (e.g. `LOCAL [X Y]`), so a
+  // flat array of word-like names is valid; a name that is itself a
+  // sub-list is not.
+  assert.throws(
+    () => evalExpr(new CallExpr("LOCAL", [[[1, 2]]]), env),
+    LogoError
+  );
 });
