@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tortue — a LOGO turtle, from MIT LISP LOGO to ES6</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>🐢 tortue</h1>
+  <p>MIT LISP LOGO (MACLISP, 1970s), translated to vanilla ES6 — SVG turtle graphics</p>
+</header>
+<main>
+  <div class="editor-pane">
+    <pre aria-hidden="true"><code id="highlight-layer"></code></pre>
+    <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"
+      >TO SQUARE :SIZE
+  REPEAT 4 [FORWARD :SIZE RIGHT 90]
+END
+
+SQUARE 120</textarea>
+  </div>
+  <svg id="canvas" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div class="controls">
+    <button id="run">Run</button>
+    <button id="stop" disabled>Stop</button>
+  </div>
+  <div id="output" aria-live="polite"></div>
+</main>
+<script type="module" src="src/app.js"></script>
+</body>
+</html>
