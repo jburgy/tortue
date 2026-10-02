@@ -42,7 +42,7 @@ that code, is licensed the same way — see [LICENSE](LICENSE).
 
 ## Status
 
-🚧 Under active development.
+🚧 Under active development. Live demo: https://bur.gy/tortue/ (deployed via GitHub Pages on every push to `main`, same as [jburgy/blog](https://github.com/jburgy/blog)).
 
 ## Running
 
