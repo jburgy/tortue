@@ -34,12 +34,13 @@ export const NO_VALUE = Symbol("NO-VALUE");
  *   word appearing where an expression is expected always names a
  *   procedure call (including `:name`, a variable read); it is never
  *   itself a literal value. This matches `reader.201`'s token stream.
- * - `Quoted`, `DoubleQuoted`, and `Bracketed` wrap the three MACLISP
- *   PASS2 quoting forms (`'x`, `"x` / `"(...)`, `[...]`); `parser.js` turns
- *   `Quoted`/`DoubleQuoted` content into literal values and `Bracketed`
- *   content into a `LogoListLit`. Comments (`; ...` / `! ... !`) are
- *   dropped entirely by the lexer and never appear in `RawToken[]`.
- * @typedef {number|string|Quoted|DoubleQuoted|Bracketed} RawToken
+ * - `Quoted`, `DoubleQuoted`, `Bracketed`, and `Parenthesized` wrap the
+ *   four structured forms the reader can emit (`'x`, `"x` / `"(...)`,
+ *   `[...]`, `(...)`); `parser.js` turns `Quoted`/`DoubleQuoted` content into
+ *   literal values, `Bracketed` into a `LogoListLit`, and `Parenthesized`
+ *   into an explicit grouped sub-expression. Comments (`; ...` / `! ... !`)
+ *   are dropped entirely by the lexer and never appear in `RawToken[]`.
+ * @typedef {number|string|Quoted|DoubleQuoted|Bracketed|Parenthesized} RawToken
  */
 
 /** `'word` — PASS2's `(QUOTE word)`. */
@@ -67,6 +68,14 @@ export class Bracketed {
   }
 }
 
+/** `(a b c)` — mirrors PASS2's native paren grouping already consumed by MACLISP. */
+export class Parenthesized {
+  /** @param {RawToken[]} items */
+  constructor(items) {
+    this.items = items;
+  }
+}
+
 /**
  * A reference to a variable, e.g. `:X`. Produced by the parser, consumed by
  * the interpreter's `evalExpr`.
@@ -79,14 +88,20 @@ export class VarRef {
 }
 
 /**
- * A literal list written with square brackets, e.g. `[1 2 3]`. Its items
- * are themselves unevaluated parse results (words, numbers, nested
- * LogoListLit, or - rarely - VarRef/CallExpr if the list contains `:x` or
- * parenthesized expressions). Evaluating a LogoListLit produces a plain
- * array of evaluated items.
+ * A literal list written with square brackets, e.g. `[1 2 3]`. Its `items`
+ * are kept as *raw, unresolved* `RawToken`s — exactly as `lexer.js` produced
+ * them, including `Quoted`/`DoubleQuoted`/nested `Bracketed` wrappers — not
+ * evaluated or even parsed. This is deliberate: the very same `[...]` can be
+ * used as inert data (`PRINT [FORWARD 100]` prints the words `FORWARD 100`
+ * without ever looking up a `FORWARD` procedure) or as a deferred
+ * instruction list (`REPEAT 4 [FORWARD 100 RIGHT 90]` parses and runs it
+ * four times) — only the primitive consuming the list knows which, so
+ * nothing is resolved until then. See `interpreter.js`'s `materialize`
+ * (data case, via `rawTokenToValue`) and `runList` (code case, via
+ * `parser.js`'s `parseLine`).
  */
 export class LogoListLit {
-  /** @param {Array<LogoValue|VarRef|CallExpr|LogoListLit>} items */
+  /** @param {RawToken[]} items */
   constructor(items) {
     this.items = items;
   }
