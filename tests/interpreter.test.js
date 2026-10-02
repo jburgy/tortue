@@ -152,10 +152,10 @@ test("TEST/IFTRUE/IFFALSE follow the global TESTFLAG convention", () => {
   assert.equal(evalExpr(new CallExpr("IFFALSE", [2]), env), 2);
 });
 
-test("IF evaluates the rest of the line only when the condition is true", () => {
+test("IF runs its single body argument only when the condition is true", () => {
   const env = new Environment();
-  assert.equal(evalExpr(new CallExpr("IF", ["TRUE", 1, 2]), env), 2);
-  assert.equal(evalExpr(new CallExpr("IF", ["FALSE", 1, 2]), env), NO_VALUE);
+  assert.equal(evalExpr(new CallExpr("IF", ["TRUE", 2]), env), 2);
+  assert.equal(evalExpr(new CallExpr("IF", ["FALSE", 2]), env), NO_VALUE);
 });
 
 test("REPEAT runs its body N times and threads a shared environment", () => {
@@ -193,6 +193,13 @@ test("WHILE/UNTIL loop based on a live condition", () => {
 test("FOREVER loops until an OUTPUT/STOP unwinds it from within a procedure", () => {
   const env = new Environment();
   env.make("N", 0);
+  // FOREVER (and REPEAT/WHILE/UNTIL) take exactly one body argument, which
+  // is a LogoListLit when written with an explicit bracket — re-parsed via
+  // `runList` (see interpreter.js's `runBodyArg`). Since this test builds
+  // the AST by hand rather than through the real lexer/parser, stub the
+  // "parseLine" `setRunList` expects as the identity function: the items
+  // here are already CallExpr forms, not raw tokens needing parsing.
+  setRunList((items) => items);
   const proc = new Procedure(
     "COUNT.TO.THREE",
     [],
@@ -201,13 +208,15 @@ test("FOREVER loops until an OUTPUT/STOP unwinds it from within a procedure", ()
         tag: null,
         forms: [
           new CallExpr("FOREVER", [
-            new CallExpr("MAKE", [
-              "N",
-              new CallExpr("TEST.ADD", [new VarRef("N"), 1]),
-            ]),
-            new CallExpr("IF", [
-              new CallExpr("TEST.GT", [new VarRef("N"), 2]),
-              new CallExpr("OUTPUT", [new VarRef("N")]),
+            new LogoListLit([
+              new CallExpr("MAKE", [
+                "N",
+                new CallExpr("TEST.ADD", [new VarRef("N"), 1]),
+              ]),
+              new CallExpr("IF", [
+                new CallExpr("TEST.GT", [new VarRef("N"), 2]),
+                new CallExpr("OUTPUT", [new VarRef("N")]),
+              ]),
             ]),
           ]),
         ],

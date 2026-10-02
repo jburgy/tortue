@@ -12,7 +12,13 @@ const ARC_POLYGON_SIDES = 30;
  * a concrete output device such as SVG.
  *
  * @typedef {Object} TurtleRenderer
- * @property {(x1:number, y1:number, x2:number, y2:number) => void} line
+ * @property {(x1:number, y1:number, x2:number, y2:number, erasing?:boolean) => void} line
+ *   When `erasing` is true, this call represents `PENERASE` retracing a
+ *   segment a matching `PENPAINT` pass already drew (see `Turtle#penErase`);
+ *   `(x1,y1,x2,y2)` are still the segment's coordinates, but a renderer is
+ *   free to ignore them and instead remove/hide whatever it drew for the
+ *   corresponding earlier `line()` call, which avoids any anti-aliasing
+ *   residue from overdrawing (see `createSvgRenderer`'s implementation).
  * @property {() => void} clear
  */
 
@@ -144,6 +150,7 @@ export class Turtle {
     this.isPenDown = true;
     this.isVisible = true;
     this.wrapEnabled = false;
+    this.isErasing = false;
     return this;
   }
 
@@ -237,7 +244,7 @@ export class Turtle {
     const { x: prevX, y: prevY } = this;
 
     if (this.isPenDown) {
-      this.renderer.line(prevX, prevY, nextX, nextY);
+      this.renderer.line(prevX, prevY, nextX, nextY, this.isErasing);
     }
 
     this.x = nextX;
@@ -294,6 +301,33 @@ export class Turtle {
    */
   penUp() {
     this.isPenDown = false;
+    return this;
+  }
+
+  /**
+   * `PENPAINT`: resume normal foreground-color drawing after a `PENERASE`
+   * pass — see `penErase`'s doc comment for the full "erase without
+   * `CLEARSCREEN`" story this is one half of.
+   * @returns {Turtle}
+   */
+  penPaint() {
+    this.isErasing = false;
+    return this;
+  }
+
+  /**
+   * `PENERASE`: the classic Logo way to "erase" something drawn earlier
+   * without a `CLEARSCREEN` — switch to `PENERASE`, retrace the exact same
+   * path, then switch back to `PENPAINT`. The renderer (see
+   * `createSvgRenderer`) is the one that decides *how* that erasing
+   * happens: this flag alone doesn't draw in the background color (that
+   * composites wrong against anti-aliased stroke edges and leaves faint
+   * ghost traces — the SVG renderer instead removes the matching
+   * previously-drawn element).
+   * @returns {Turtle}
+   */
+  penErase() {
+    this.isErasing = true;
     return this;
   }
 
@@ -545,8 +579,33 @@ export function createSvgRenderer(svgElement) {
     };
   }
 
+  /**
+   * LIFO stack of `<line>` elements drawn with the pen in paint mode, most
+   * recent last. `PENERASE` removes the most-recently-drawn still-present
+   * element instead of overdrawing it in the background color, which would
+   * composite incorrectly against anti-aliased stroke edges and leave
+   * faint ghost traces. This matches this app's usage: every `PENERASE`
+   * retraces, in the same order, exactly the segments the immediately
+   * preceding `PENPAINT` pass just drew (the clock hand, not the long-ago
+   * ticks). Must be LIFO (`pop`), not FIFO (`shift`): erasing oldest-first
+   * would eat the ticks long before reaching the hand.
+   * @type {SVGLineElement[]}
+   */
+  const paintedLines = [];
+
   return {
-    line(x1, y1, x2, y2) {
+    /**
+     * @param {number} x1
+     * @param {number} y1
+     * @param {number} x2
+     * @param {number} y2
+     * @param {boolean} [erasing] See `Turtle#penErase`'s doc comment.
+     */
+    line(x1, y1, x2, y2, erasing = false) {
+      if (erasing) {
+        paintedLines.pop()?.remove();
+        return;
+      }
       const start = toSvgPoint(x1, y1);
       const end = toSvgPoint(x2, y2);
       const line = document.createElementNS(SVG_NS, "line");
@@ -557,9 +616,11 @@ export function createSvgRenderer(svgElement) {
       line.setAttribute("stroke", "currentColor");
       line.setAttribute("fill", "none");
       ensurePictureLayer().appendChild(line);
+      paintedLines.push(line);
     },
     clear() {
       ensurePictureLayer().replaceChildren();
+      paintedLines.length = 0;
     },
   };
 }
@@ -616,6 +677,12 @@ function registerTurtlePrimitives() {
 
   defStatePrimitive("PENUP", 0, () => defaultTurtle.penUp());
   defAbbreviations("PENUP", ["PU"]);
+
+  defStatePrimitive("PENPAINT", 0, () => defaultTurtle.penPaint());
+  defAbbreviations("PENPAINT", ["PPT"]);
+
+  defStatePrimitive("PENERASE", 0, () => defaultTurtle.penErase());
+  defAbbreviations("PENERASE", ["PE"]);
 
   defPrimitive("PENSTATE", {
     kind: "expr",

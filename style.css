@@ -4,6 +4,8 @@
   --fg: #e4e4e8;
   --accent: #7dd3fc;
   --border: #44475a;
+  --terminal-green: #33ff33;
+  --canvas-bg: #000;
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
@@ -89,10 +91,12 @@ main {
 #canvas {
   width: 100%;
   height: 100%;
-  background: #0d0d14;
+  background: var(--canvas-bg);
   border: 1px solid var(--border);
   border-radius: 4px;
-  color: var(--accent);
+  /* Classic phosphor-terminal green, matching the original childhood demo
+     this project recreates — see tests/program.test.js's clock example. */
+  color: var(--terminal-green);
 }
 
 .controls {

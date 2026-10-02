@@ -35,12 +35,62 @@ function toLines(sourceText) {
 /**
  * Tokenize one physical line's text, returning `null` for a blank/
  * comment-only line (nothing to parse).
- * @param {string} lineText
+ * @param {import('./types.js').RawToken[]} tokens
  * @returns {import('./types.js').RawToken[]|null}
  */
-function tokenizeNonEmpty(lineText) {
-  const tokens = tokenize(lineText);
+function nonEmpty(tokens) {
   return tokens.length === 0 ? null : tokens;
+}
+
+/**
+ * Messages `lexer.js` throws specifically when it runs out of input with a
+ * `[` or `(` still open — i.e. "there might be more on the next physical
+ * line", as opposed to a genuine syntax error. Matched here (rather than
+ * exposing a dedicated error class from lexer.js) because these three
+ * exact strings are the full set of "unterminated" cases it can raise; see
+ * `src/lexer.js`'s `parseSequence`/`readParenthesizedTokens`.
+ */
+const UNTERMINATED_MESSAGES = new Set([
+  "Unmatched [",
+  "Unmatched (",
+  "Unmatched ( in double-quoted list",
+]);
+
+/**
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+function isUnterminated(error) {
+  return error instanceof LogoError && UNTERMINATED_MESSAGES.has(error.message);
+}
+
+/**
+ * Tokenize the "logical line" starting at `lines[index]`: if it ends with
+ * an unclosed `[` or `(`, additional physical lines are folded in (joined
+ * by a newline, so a trailing `; comment` on an earlier line doesn't eat
+ * the continuation) until the brackets balance or the script runs out —
+ * this is what lets a bracketed body (`REPEAT`/`IF`/`WHILE`/.../`FOREVER`,
+ * or a `TO` block) span multiple lines for readability instead of forcing
+ * everything onto one very long line.
+ * @param {string[]} lines
+ * @param {number} index
+ * @returns {{tokens: import('./types.js').RawToken[]|null, nextIndex: number}}
+ */
+function readLogicalLine(lines, index) {
+  let text = lines[index];
+  let nextIndex = index + 1;
+  while (true) {
+    try {
+      return { tokens: nonEmpty(tokenize(text)), nextIndex };
+    } catch (error) {
+      if (isUnterminated(error) && nextIndex < lines.length) {
+        text += "\n" + lines[nextIndex];
+        nextIndex += 1;
+        continue;
+      }
+      throw error;
+    }
+  }
 }
 
 /**
@@ -81,8 +131,8 @@ function scan(sourceText) {
 
   let i = 0;
   while (i < lines.length) {
-    const tokens = tokenizeNonEmpty(lines[i]);
-    i++;
+    const { tokens, nextIndex } = readLogicalLine(lines, i);
+    i = nextIndex;
     if (tokens === null) continue;
 
     if (typeof tokens[0] === "string" && tokens[0].toUpperCase() === "TO") {
@@ -98,18 +148,18 @@ function scan(sourceText) {
       const bodyLines = [];
       let sawEnd = false;
       while (i < lines.length) {
-        const bodyTokens = tokenizeNonEmpty(lines[i]);
-        i++;
-        if (bodyTokens === null) continue;
+        const body = readLogicalLine(lines, i);
+        i = body.nextIndex;
+        if (body.tokens === null) continue;
         if (
-          bodyTokens.length === 1 &&
-          typeof bodyTokens[0] === "string" &&
-          bodyTokens[0].toUpperCase() === "END"
+          body.tokens.length === 1 &&
+          typeof body.tokens[0] === "string" &&
+          body.tokens[0].toUpperCase() === "END"
         ) {
           sawEnd = true;
           break;
         }
-        bodyLines.push(bodyTokens);
+        bodyLines.push(body.tokens);
       }
       if (!sawEnd) {
         throw new LogoError(`${name.toUpperCase()} HAS NO END`);

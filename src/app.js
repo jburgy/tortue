@@ -64,7 +64,7 @@ function runScript() {
     const message = event.data ?? {};
     switch (message.type) {
       case "line":
-        renderer.line(message.x1, message.y1, message.x2, message.y2);
+        renderer.line(message.x1, message.y1, message.x2, message.y2, message.erasing);
         break;
       case "clear":
         renderer.clear();

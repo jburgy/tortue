@@ -15,11 +15,59 @@
   <div class="editor-pane">
     <pre aria-hidden="true"><code id="highlight-layer"></code></pre>
     <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"
-      >TO SQUARE :SIZE
-  REPEAT 4 [FORWARD :SIZE RIGHT 90]
-END
+      >; tortue clock — recreating a childhood LOGO final project: a watch
+; face with 12 tick marks and an animated seconds hand. The hand is a
+; kite ("half-symmetric rhombus"): longer toward the time it points to,
+; shorter behind the pivot, but mirror-symmetric left-to-right.
+;
+; Like the original, no CLEARSCREEN: the hand is erased with PENERASE
+; (retracing its own outline) before the new one is drawn with PENPAINT,
+; so only the hand ever redraws — the ticks are drawn once. SLEEP's
+; 0.95s is the same kind of empirically-tuned constant the original
+; project used: close to a real second, not exact, so it drifts gently
+; over a long run exactly like the original did.
 
-SQUARE 120</textarea>
+REPEAT 12 [
+  PENUP FORWARD 240 PENDOWN
+  REPEAT 2 [
+    FORWARD 40 RIGHT 90 FORWARD 10 RIGHT 90
+  ]
+  PENUP BACK 240 RIGHT 30
+]
+
+MAKE "SECONDS 0
+MAKE "DRAWN "FALSE
+
+FOREVER [
+  IF :DRAWN = "TRUE [
+    PENERASE
+    PENUP
+    SETXY (200 * :S) (200 * :C)
+    PENDOWN
+    SETXY (14 * :C) (0 - 14 * :S)
+    SETXY (0 - 30 * :S) (0 - 30 * :C)
+    SETXY (0 - 14 * :C) (14 * :S)
+    SETXY (200 * :S) (200 * :C)
+    PENUP
+    HOME
+  ]
+  PENPAINT
+  MAKE "H :SECONDS * 6
+  MAKE "S SINE :H
+  MAKE "C COSINE :H
+  PENUP
+  SETXY (200 * :S) (200 * :C)
+  PENDOWN
+  SETXY (14 * :C) (0 - 14 * :S)
+  SETXY (0 - 30 * :S) (0 - 30 * :C)
+  SETXY (0 - 14 * :C) (14 * :S)
+  SETXY (200 * :S) (200 * :C)
+  PENUP
+  HOME
+  MAKE "DRAWN "TRUE
+  SLEEP 0.95
+  MAKE "SECONDS REMAINDER (:SECONDS + 1) 60
+]</textarea>
   </div>
   <svg id="canvas" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg"></svg>
   <div class="controls">
