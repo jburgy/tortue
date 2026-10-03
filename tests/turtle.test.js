@@ -211,8 +211,12 @@ function readClockDemoSource() {
 /**
  * index.html's actual clock program, with its one real-time concession
  * stripped out so the test runs instantly instead of ticking once per
- * second: `FOREVER` becomes a bounded `REPEAT`, and the `SLEEP` call (a
- * synchronous busy-wait, see `src/primitives.js`) is dropped entirely.
+ * second. The `FOREVER [ draw ... SLEEP ... erase ... ]` body is split at
+ * its `SLEEP` line (dropped — a synchronous busy-wait, see
+ * `src/primitives.js`) into a draw half and an erase half, then replayed as
+ * `ticks - 1` complete draw/erase cycles (via a bounded `REPEAT`) followed
+ * by one final draw with no matching erase, so the hand is left visible —
+ * exactly as the real `FOREVER` loop leaves it mid-`SLEEP` at any moment.
  * Everything else, including the 12-tick face and the FORWARD/BACK/LEFT/
  * RIGHT kite hand with its reverse-order erase, is read from index.html
  * as-is.
@@ -220,9 +224,17 @@ function readClockDemoSource() {
  * @returns {string}
  */
 function clockProgram(ticks) {
-  return readClockDemoSource()
-    .replace("FOREVER [", `REPEAT ${ticks} [`)
-    .replace(/\n\s*SLEEP [\d.]+\n/, "\n");
+  const source = readClockDemoSource();
+  const match = source.match(/FOREVER \[([\s\S]*)\n\]\s*$/);
+  if (!match) {
+    throw new Error("Could not find the FOREVER loop in index.html");
+  }
+  const [drawPart, erasePart] = match[1].split(/\n\s*SLEEP [\d.]+\n/);
+  if (erasePart === undefined) {
+    throw new Error("Could not find the SLEEP line separating draw and erase");
+  }
+  const header = source.slice(0, match.index);
+  return `${header}REPEAT ${ticks - 1} [\n${drawPart}\n${erasePart}\n]\n${drawPart}\n`;
 }
 
 test("after one tick, the clock has drawn exactly the 12 ticks plus one hand", () => {
