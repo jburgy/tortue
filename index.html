@@ -15,47 +15,54 @@
   <div class="editor-pane">
     <pre aria-hidden="true"><code id="highlight-layer"></code></pre>
     <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"
-      >; tortue clock — a watch face with 12 ticks and an animated seconds
-; hand shaped like a kite, longer toward the time it points to.
-
-REPEAT 12 [
-  PENUP FORWARD 240 PENDOWN
+      >REPEAT 12 [
+  PENUP FORWARD 240
+  RIGHT 90 BACK 5 LEFT 90
+  PENDOWN
   REPEAT 2 [ FORWARD 40 RIGHT 90 FORWARD 10 RIGHT 90 ]
-  PENUP BACK 240 RIGHT 30
+  PENUP
+  RIGHT 90 FORWARD 5 LEFT 90
+  BACK 240 RIGHT 30
 ]
 
-MAKE "SECONDS 0
 MAKE "DRAWN "FALSE
 
 FOREVER [
   IF :DRAWN = "TRUE [
     PENERASE
     PENUP
-    SETXY (200 * :S) (200 * :C)
+    FORWARD 200
+    RIGHT 4
     PENDOWN
-    SETXY (14 * :C) (0 - 14 * :S)
-    SETXY (0 - 30 * :S) (0 - 30 * :C)
-    SETXY (0 - 14 * :C) (14 * :S)
-    SETXY (200 * :S) (200 * :C)
+    BACK 200
+    LEFT 29
+    BACK 33
+    LEFT 130
+    BACK 33
+    LEFT 29
+    BACK 200
+    LEFT 176
     PENUP
-    HOME
+    BACK 200
   ]
   PENPAINT
-  MAKE "H :SECONDS * 6
-  MAKE "S SINE :H
-  MAKE "C COSINE :H
+  RIGHT 6
   PENUP
-  SETXY (200 * :S) (200 * :C)
+  FORWARD 200
   PENDOWN
-  SETXY (14 * :C) (0 - 14 * :S)
-  SETXY (0 - 30 * :S) (0 - 30 * :C)
-  SETXY (0 - 14 * :C) (14 * :S)
-  SETXY (200 * :S) (200 * :C)
+  RIGHT 176
+  FORWARD 200
+  RIGHT 29
+  FORWARD 33
+  RIGHT 130
+  FORWARD 33
+  RIGHT 29
+  FORWARD 200
   PENUP
-  HOME
+  LEFT 4
+  BACK 200
   MAKE "DRAWN "TRUE
-  SLEEP 0.95
-  MAKE "SECONDS REMAINDER (:SECONDS + 1) 60
+  SLEEP 0.994
 ]</textarea>
   </div>
   <svg id="canvas" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg"></svg>
