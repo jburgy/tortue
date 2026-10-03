@@ -117,14 +117,21 @@ export function highlightToHtml(source) {
  *   programmatic value change not triggered by an `input` event).
  */
 export function attachHighlighting(textarea, highlightLayer) {
+  // The CSS that makes this overlay work (`.editor-pane pre`: absolutely
+  // positioned, `overflow: auto`) targets the `<pre>` wrapper, not the
+  // `<code>` passed in as `highlightLayer` — `<code>` is just an inline
+  // element with no scrollbox of its own. Scrolling has to be mirrored onto
+  // that `<pre>` ancestor, or the textarea scrolls while the colored
+  // overlay stays put.
+  const scrollContainer = highlightLayer.closest("pre") ?? highlightLayer;
   function render() {
     // A trailing newline keeps the overlay's last line the same height as
     // the textarea's when the user's last line is empty.
     highlightLayer.innerHTML = highlightToHtml(textarea.value) + "\n";
   }
   function syncScroll() {
-    highlightLayer.scrollTop = textarea.scrollTop;
-    highlightLayer.scrollLeft = textarea.scrollLeft;
+    scrollContainer.scrollTop = textarea.scrollTop;
+    scrollContainer.scrollLeft = textarea.scrollLeft;
   }
   textarea.addEventListener("input", render);
   textarea.addEventListener("scroll", syncScroll);
