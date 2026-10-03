@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
 
 import { PRIMITIVES } from "../src/types.js";
 import { Turtle, createSvgRenderer, setDefaultTurtle } from "../src/turtle.js";
@@ -192,66 +193,36 @@ test("abbreviations share the same primitive registration", () => {
 });
 
 /**
+ * Extract the Logo source embedded in index.html's `<textarea>`, verbatim
+ * — reading it from the actual demo file rather than maintaining a second,
+ * hand-copied source string that a future edit to the demo could silently
+ * drift out of sync with.
+ * @returns {string}
+ */
+function readClockDemoSource() {
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const match = html.match(/<textarea[^>]*>([\s\S]*?)<\/textarea>/);
+  if (!match) {
+    throw new Error("Could not find <textarea> contents in index.html");
+  }
+  return match[1];
+}
+
+/**
  * index.html's actual clock program, with its one real-time concession
  * stripped out so the test runs instantly instead of ticking once per
  * second: `FOREVER` becomes a bounded `REPEAT`, and the `SLEEP` call (a
  * synchronous busy-wait, see `src/primitives.js`) is dropped entirely.
- * Everything else — the 12-tick face and the FORWARD/BACK/LEFT/RIGHT
- * kite hand with its reverse-order erase — is copied verbatim.
+ * Everything else, including the 12-tick face and the FORWARD/BACK/LEFT/
+ * RIGHT kite hand with its reverse-order erase, is read from index.html
+ * as-is.
  * @param {number} ticks how many erase/paint cycles to run
  * @returns {string}
  */
 function clockProgram(ticks) {
-  return `
-REPEAT 12 [
-  PENUP FORWARD 240
-  RIGHT 90 BACK 5 LEFT 90
-  PENDOWN
-  REPEAT 2 [ FORWARD 40 RIGHT 90 FORWARD 10 RIGHT 90 ]
-  PENUP
-  RIGHT 90 FORWARD 5 LEFT 90
-  BACK 240 RIGHT 30
-]
-
-MAKE "DRAWN "FALSE
-
-REPEAT ${ticks} [
-  IF :DRAWN = "TRUE [
-    PENERASE
-    PENUP
-    FORWARD 200
-    RIGHT 4
-    PENDOWN
-    BACK 200
-    LEFT 29
-    BACK 33
-    LEFT 130
-    BACK 33
-    LEFT 29
-    BACK 200
-    LEFT 176
-    PENUP
-    BACK 200
-  ]
-  PENPAINT
-  RIGHT 6
-  PENUP
-  FORWARD 200
-  PENDOWN
-  RIGHT 176
-  FORWARD 200
-  RIGHT 29
-  FORWARD 33
-  RIGHT 130
-  FORWARD 33
-  RIGHT 29
-  FORWARD 200
-  PENUP
-  LEFT 4
-  BACK 200
-  MAKE "DRAWN "TRUE
-]
-`;
+  return readClockDemoSource()
+    .replace("FOREVER [", `REPEAT ${ticks} [`)
+    .replace(/\n\s*SLEEP [\d.]+\n/, "\n");
 }
 
 test("after one tick, the clock has drawn exactly the 12 ticks plus one hand", () => {
